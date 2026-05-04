@@ -1,0 +1,36 @@
+# Data (materials/particles) calculated with SRIM
+
+# Base folder for generated SRIM CSV tables.
+# Variant folders `bragg_{pct}` are appended automatically.
+SRIM_processed_path: "physics/SRIM/_processed"
+
+# Base folder for raw SRIM `.dat` outputs.
+# Variant folders `bragg_{pct}` are appended automatically.
+SRIM_raw_path: "physics/SRIM/_raw"
+
+# Available Bragg correction variants (%).
+bragg_corrections: [0, 3, 5]
+
+# SRIM LET data should be saved with these (default) units
+# and is then converted to keV/um
+SRIM_LET_units: "MeV / (mg/cm2)"
+
+materials:
+  # name, density (g/cm3)
+  CR39: 
+    density_g_cm3: 1.31
+  water: 
+    density_g_cm3: 1.00
+
+# particle names
+particles:
+  - 1H
+  - 2H
+  - 3H
+  - 4He
+  - 7Li
+  - 9Be
+  - 11B
+  - 12C
+  - 14N
+  - 16O

@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tracketch"
+version = "1.0.0"
+description = "Ion track etching simulator for CR39 detectors with track structure theory and wavefront propagation"
+authors = [
+    { name = "Jeppe Brage Christensen", email = "jeppe.christensen@psi.ch" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyamtrack",
+    "numpy<=2.2",
+    "matplotlib",
+    "seaborn",
+    "pyyaml",
+    "pandas",
+    "scipy",
+    "joblib",
+    "scikit-fmm",
+    "scikit-image",
+]
+
+
+[project.optional-dependencies]
+
+cpp = [
+    "pybind11>=2.6",
+]
+
+numba = [
+    "numba>=0.57",
+    "numpy<=2.2",
+]   
+
+calibration = [
+    "scikit-optimize",
+    "lmfit",
+    "tqdm",
+    "numpy<=2.2",
+]
+
+docs = [
+    "sphinx>=8,<9",
+    "sphinx-rtd-theme>=3.0",
+]
+
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "ruff",
+    "numpy<=2.2",
+    "scikit-image",
+    "sphinx>=8,<9",
+    "sphinx-rtd-theme>=3.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["tracketch*", "calibration*"]
+
+[tool.ruff]
+exclude = ["_archive"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

@@ -1,0 +1,18 @@
+.wy-side-nav-search {
+    background-color: #143048;
+}
+
+.wy-side-nav-search > a,
+.wy-side-nav-search .wy-dropdown > a {
+    margin-bottom: 0.75rem;
+}
+
+.wy-side-nav-search > a img.logo,
+.wy-side-nav-search .wy-dropdown > a img.logo {
+    background: #ffffff;
+    border-radius: 10px;
+    display: block;
+    margin: 0 auto;
+    max-width: 92%;
+    padding: 0.5rem;
+}

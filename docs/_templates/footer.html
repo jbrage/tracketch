@@ -1,0 +1,12 @@
+{% extends "!footer.html" %}
+
+{% block extrafooter %}
+  <div class="tracketch-doc-meta">
+    Documentation author: {{ author_name | e }}.
+    {% if author_email %}
+      <a href="mailto:{{ author_email | e }}">{{ author_email | e }}</a>.
+    {% endif %}
+    {{ institute | e }}.
+    Compilation date: {{ compilation_date | e }}.
+  </div>
+{% endblock %}

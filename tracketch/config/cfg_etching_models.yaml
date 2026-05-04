@@ -1,0 +1,19 @@
+
+
+PSI_etching:
+  # V_bulk_um_h = 13.0 / 2 hr: 45
+  V_bulk_um_h: 4.72
+
+Doerschel_etching:
+  # 1:73+/-0:05 um/hr.
+  V_bulk_um_h: 1.73
+
+# Model file paths configuration
+model_paths:
+  # Base directory for saved models (relative to the tracketch package root)
+  base_dir: "etching/models"
+
+  # Default model filenames by model name.
+  # Standard single-calibration model used across particles.
+  default_models:
+    Doerschel_etching: "Doerschel_etching.json"
