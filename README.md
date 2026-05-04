@@ -3,7 +3,6 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-pytest-brightgreen.svg)](tests/)
 
-
 # tracketch
 
 A Python toolkit for simulating ion tracks in CR-39 plastic nuclear track
