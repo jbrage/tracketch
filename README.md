@@ -19,13 +19,9 @@ by Jeppe Brage Christensen.
 > [libamtrack](https://libamtrack.github.io/), `tracketch` currently runs on
 > **Linux only**. Most Windows installations support WSL installations.
 
-<table align="center">
-   <tr>
-      <td bgcolor="white">
-         <img src="docs/icons/logo.png" alt="tracketch logo" width="500">
-      </td>
-   </tr>
-</table>
+<p align="center">
+  <img src="docs/icons/logo_BW.png" alt="tracketch logo" width="500">
+</p>
 
 
 Cite as 
@@ -234,8 +230,8 @@ to build the PDF version of the documentation.
 ├── tracketch/                 Core library
 │   ├── physics/               Ion physics: LET, CSDA, RDD (SRIM + libamtrack)
 │   │   └── stopping_power/    SRIM data tables and parsing
-│   ├── etching/               EtchRateModel -- dose -> etch velocity
-│   ├── simulation/            TrackSimulator -- full model
+│   ├── etching/               EtchRateModel - dose -> etch velocity
+│   ├── simulation/            TrackSimulator - full model
 │   └── wavefront/             Track contour calculation through arrival-time
 │                              solvers (Dijkstra, FMM)
 ├── calibration/               Etch-model calibration against experimental data
