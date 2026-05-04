@@ -71,8 +71,8 @@ final_fit = True
 
 if final_fit:
     # Final-fit profile aligned with benchmark settings
-    de_popsize = 50
-    de_maxiter = 50
+    de_popsize = 60
+    de_maxiter = 200
     de_tol = 1e-6
     de_mutation = (0.5, 1.4)
     de_recombination = 0.9
@@ -100,10 +100,10 @@ debris_beta_bounds = (0.3, 4.0)
 d_Gy = np.concatenate(
     [
         # Match benchmark anchor buckets exactly.
-        np.logspace(2, 4, endpoint=False, num=1),
-        np.logspace(4, 5, endpoint=False, num=2),
-        np.logspace(5, 8, endpoint=False, num=10),
-        np.logspace(8, 9, endpoint=True, num=3),
+        np.logspace(2, 4, endpoint=False, num=2),
+        np.logspace(4, 5, endpoint=False, num=3),
+        np.logspace(5, 8, endpoint=False, num=9),
+        np.logspace(8, 9, endpoint=True, num=2),
     ]
 )
 d_Gy = np.unique(d_Gy)  # Remove duplicates
@@ -220,11 +220,14 @@ for sub_dict in models_dict.values():
     for entry in sub_dict.values():
         entry["simulator"].recalculate_from_current_etch_model()
 
+folder_name = "figures_calibration" if final_fit else "figures_calibration_dev"
+os.makedirs(folder_name, exist_ok=True)
+
 if objective_mode in ["both", "shape"]:
     figs = plot_track_shapes(models_dict["track_shape"], xscale="linear")
     shape_keys = list(models_dict["track_shape"].keys())
     for i, particle in enumerate(shape_keys):
-        figs[i].savefig(f"figures/track_shape_{particle}.png", dpi=300)
+        figs[i].savefig(f"{folder_name}/track_shape_{particle}.png", dpi=300)
 
     # Debris comparison: contours with vs without damping
     debris_figs = plot_track_shapes_debris_comparison(
@@ -232,15 +235,13 @@ if objective_mode in ["both", "shape"]:
     )
     for i, particle in enumerate(shape_keys):
         debris_figs[i].savefig(
-            f"figures/debris_comparison_{particle}.png",
+            f"{folder_name}/debris_comparison_{particle}.png",
             dpi=300,
         )
 
 if objective_mode in ["both", "length"]:
     figs_by_ion = plot_track_length(models_dict["track_length"])
     for ion, fig in figs_by_ion.items():
-        folder_name = "figures_calibration" if final_fit else "figures_calibration_dev"
-        os.makedirs(folder_name, exist_ok=True)
         fig.savefig(f"{folder_name}/track_length_{ion}.png", dpi=300)
 
     # %%

@@ -16,7 +16,7 @@ track structure theory](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6469
 by Jeppe Brage Christensen.
 
 > **Note** - due to its dependency on
-> [libamtrack](https://libamtrack.github.io/), **tracketch** currently runs on
+> [libamtrack](https://libamtrack.github.io/), `tracketch` currently runs on
 > **Linux only**. Most Windows installations support WSL installations.
 
 <table align="center">

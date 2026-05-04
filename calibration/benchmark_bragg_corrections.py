@@ -44,7 +44,7 @@ elif RUN_MODE == "full":
     PARTICLES = ["1H", "4He", "7Li", "12C"]
     SEEDS = [11, 22]
     POPSIZE = 50
-    MAXITER = 300
+    MAXITER = 50
     TOL = 1e-6
     OUTPUT_DIR_NAME = "bragg_benchmark"
 else:
@@ -60,18 +60,14 @@ MAX_VELOCITY_UM_H = 100.0
 
 SMOOTHNESS_WEIGHT = 0.001
 
-# More general seeded initialization for V(d):
-# - build a broader log-dose anchor grid
-# - perturb log-velocity increments per seed
-ANCHOR_MIN_DOSE_GY = 1e2
-ANCHOR_MAX_DOSE_GY = 1e9
-# Piecewise anchor placement with highest density in 1e5..1e7 Gy.
-ANCHOR_MID_MIN_DOSE_GY = 1e4
-ANCHOR_DENSE_MIN_DOSE_GY = 1e5
-ANCHOR_DENSE_MAX_DOSE_GY = 1e8
-ANCHOR_DENSITY_WEIGHTS = (2.0, 3.0, 30.0, 5.0)
-# Run one or multiple anchor-count configurations.
-ANCHOR_COUNT_USER_OPTIONS = [40]
+# Match run_Vd_calibration.py anchor buckets exactly.
+# d_Gy = concat([
+#   logspace(2, 4, endpoint=False, num=1),
+#   logspace(4, 5, endpoint=False, num=2),
+#   logspace(5, 8, endpoint=False, num=8),
+#   logspace(8, 9, endpoint=True,  num=2),
+# ])
+ANCHOR_COUNT_USER_OPTIONS = [13]
 INIT_LOG_INCREMENT_NOISE_STD = 0.08
 
 # Run debris damping in separate configurations.
@@ -123,52 +119,24 @@ def _save_track_shape_pngs(models_dict: dict, run_dir: Path) -> list[str]:
 
 
 def _build_user_anchor_dose_grid(anchor_count_user: int) -> np.ndarray:
-    """Build piecewise log-dose anchors with dense spacing in 1e5..1e8 Gy."""
-    if anchor_count_user < 4:
-        return np.logspace(
-            np.log10(ANCHOR_MIN_DOSE_GY),
-            np.log10(ANCHOR_MAX_DOSE_GY),
-            anchor_count_user,
-        )
-
-    dose_edges = np.asarray(
+    """Build the same anchor-dose grid as run_Vd_calibration.py."""
+    user_doses = np.concatenate(
         [
-            ANCHOR_MIN_DOSE_GY,
-            ANCHOR_MID_MIN_DOSE_GY,
-            ANCHOR_DENSE_MIN_DOSE_GY,
-            ANCHOR_DENSE_MAX_DOSE_GY,
-            ANCHOR_MAX_DOSE_GY,
-        ],
-        dtype=float,
+            np.logspace(2, 4, endpoint=False, num=1),
+            np.logspace(4, 5, endpoint=False, num=2),
+            np.logspace(5, 8, endpoint=False, num=8),
+            np.logspace(8, 9, endpoint=True, num=2),
+        ]
     )
-    weights = np.asarray(ANCHOR_DENSITY_WEIGHTS, dtype=float)
+    user_doses = np.unique(user_doses)
+    user_doses = np.sort(user_doses)
 
-    seg_counts = np.maximum(
-        1, np.floor(anchor_count_user * weights / weights.sum()).astype(int)
-    )
-    while int(seg_counts.sum()) < anchor_count_user:
-        seg_counts[int(np.argmax(weights))] += 1
-    while int(seg_counts.sum()) > anchor_count_user:
-        reducible = np.where(seg_counts > 1)[0]
-        if reducible.size == 0:
-            break
-        seg_counts[int(reducible[np.argmin(weights[reducible])])] -= 1
-
-    segments: list[np.ndarray] = []
-    for i, n_pts in enumerate(seg_counts):
-        seg = np.logspace(
-            np.log10(dose_edges[i]),
-            np.log10(dose_edges[i + 1]),
-            int(n_pts),
-            endpoint=(i == len(seg_counts) - 1),
+    if anchor_count_user != len(user_doses):
+        raise ValueError(
+            "anchor_count_user must match run_Vd_calibration anchor count "
+            f"({len(user_doses)}), got {anchor_count_user}"
         )
-        segments.append(seg)
 
-    user_doses = np.sort(np.concatenate(segments))
-
-    # Enforce exact endpoints for reproducibility and requested full range.
-    user_doses[0] = ANCHOR_MIN_DOSE_GY
-    user_doses[-1] = ANCHOR_MAX_DOSE_GY
     return user_doses
 
 
