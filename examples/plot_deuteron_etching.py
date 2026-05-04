@@ -19,7 +19,6 @@ energies_MeV_u = [0.1, 0.5, 1.0, 2.0, 5.0]
 result_df = pd.DataFrame()
 # iterate through combinations and calculate track radius for each
 for energy_MeV_u in tqdm.tqdm(energies_MeV_u, total=len(energies_MeV_u)):
-
     # create simulator
     sim = TrackSimulator(
         particle_name=particle,

@@ -208,9 +208,7 @@ etch_model.anchor_velocity_uncertainties_um_h = unc["velocity_uncertainties_um_h
 # uncertainty: when anchors saturate at V_max, this is the most relevant
 # constraint on the saturation velocity.
 if np.isfinite(etch_model.V_max_um_h):
-    etch_model.V_max_uncertainty_um_h = float(
-        unc["velocity_uncertainties_um_h"][-1]
-    )
+    etch_model.V_max_uncertainty_um_h = float(unc["velocity_uncertainties_um_h"][-1])
 
 # Save results
 etch_model.name = CALIBRATED_MODEL_NAME

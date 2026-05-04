@@ -7,12 +7,26 @@
 # tracketch
 
 A Python toolkit for simulating ion tracks in CR-39 plastic nuclear track
-detectors.  Given an ion species, energy, and etching conditions, `tracketch`
-predicts the track countours, diameter, and depth that would be observed under an
-optical microscope after chemical etching.
+detectors. Given an ion species, energy, and etching conditions, `tracketch`
+predicts the track countours, diameter and length for a given etching duration.
 
 The work is published in the article
-[A unified model for etched-track formation in CR-39 detectors using amorphous track structure theory](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6469212) by Jeppe Brage Christensen.
+[A unified model for etched-track formation in CR-39 detectors using amorphous
+track structure theory](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6469212)
+by Jeppe Brage Christensen.
+
+> **Note** - due to its dependency on
+> [libamtrack](https://libamtrack.github.io/), **tracketch** currently runs on
+> **Linux only**. Most Windows installations support WSL installations.
+
+<table align="center">
+   <tr>
+      <td bgcolor="white">
+         <img src="docs/icons/logo.png" alt="tracketch logo" width="500">
+      </td>
+   </tr>
+</table>
+
 
 Cite as 
 ```bibtex
@@ -24,37 +38,38 @@ Cite as
 }
 ```
 
-<p align="center">
-   <img src="docs/icons/logo.png" alt="tracketch logo" width="500">
-</p>
-
-
-> **Note** - due to its dependency on
-> [libamtrack](https://libamtrack.github.io/), **tracketch** currently runs on
-> **Linux only**. Most Windows installations support WSL installations.
-
-
-> **Note** - This version only supports simulations of ion impinging perpendicular to the CR39 detector surface.  Support for 3D track geometries and non-axisymmetric effects is planned for future releases.
-> Furthermore, this etch-rate model is calibrated to the detector type and etching conditions used in [Dörschel et al (2003)](https://www.sciencedirect.com/science/article/abs/pii/S1350448702000471). For other detector types and etching conditions, the calibration workflow described in the documentation can be used to re-calibrate the model against experimental data.
+> **Note** - This version only supports simulations of ion impinging
+> perpendicular to the CR39 detector surface. Support for 3D track geometries
+> and non-axisymmetric effects is planned for future releases.
+> Furthermore, this etch-rate model is calibrated to the detector type and
+> etching conditions used in
+> [Dörschel et al (2003)](https://www.sciencedirect.com/science/article/abs/pii/S1350448702000471).
+> For other detector types and etching conditions, the calibration workflow
+> described in the documentation can be used to re-calibrate the model against
+> experimental data.
 
 
 ## Documentation
 
-The documentation is hosted online and includes user guides, API references, and examples: [Documentation](https://jbrage.github.io/tracketch/)  
+The documentation is hosted online and includes user guides, API references,
+and examples: [Documentation](https://jbrage.github.io/tracketch/)
+A PDF version of the documentation is also available in the `docs/` directory: [tracketch_docs.pdf](docs/tracketch.pdf)
 
 ## How it works
 
 The simulation follows the same physics chain as the real experiment:
 
-1. **Radial dose distribution (RDD)**: the ion deposits energy radially via
-   delta-electrons.  `tracketch` computes the dose map along the ion path using
-   models from `libamtrack` (e.g. Cucinotta) and `SRIM` stopping-power tables.
+1. **Dose maps**: the ion deposits energy radially via delta-electrons.
+   `tracketch` computes the dose map along the ion path using amorphous track
+   structure models from `libamtrack` (e.g. Cucinotta) and slows down the ion
+   in the CR-39 detector using `SRIM` stopping-power tables.
 2. **Etch-rate model**: a calibrated function converts local dose to local
    etch velocity $v_d$. The bulk (undamaged) material etches at a slower
    constant rate $v_\text{bulk}$.
-3. **Wavefront propagation**: the etchant front is propagated from the
-   detector surface into the bulk using shortest-path algorithms (Dijkstra or
-   Fast Marching), analogous to the propagation of a wavefront.  The result is an *arrival-time map*.
+3. **Wavefront propagation**: the etchant front is propagated from the detector
+   surface into the bulk using shortest-path algorithms (Dijkstra or Fast
+   Marching), analogous to the propagation of a wavefront. The result is an
+   *arrival-time map*.
 4. **Track observables**: iso-time contours of the arrival-time map give the
    etched track shape at any desired etching duration.
 
@@ -66,7 +81,8 @@ The simulation follows the same physics chain as the real experiment:
 git clone <repo-url>/tracketch
 cd tracketch
 
-# create a virtual environment and install; change "all" to "numba" or "cpp" to only install one backend or to skip testing/docs dependencies
+# create a virtual environment and install; change "all" to "numba" or "cpp"
+# to only install one backend or to skip testing/docs dependencies
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[all]"
@@ -220,7 +236,8 @@ to build the PDF version of the documentation.
 │   │   └── stopping_power/    SRIM data tables and parsing
 │   ├── etching/               EtchRateModel -- dose -> etch velocity
 │   ├── simulation/            TrackSimulator -- full model
-│   └── wavefront/             Track contour calculation through arrival-time solvers (Dijkstra, FMM)
+│   └── wavefront/             Track contour calculation through arrival-time
+│                              solvers (Dijkstra, FMM)
 ├── calibration/               Etch-model calibration against experimental data
 ├── examples/                  Runnable example scripts
 ├── tests/                     pytest test suite
