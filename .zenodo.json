@@ -3,8 +3,7 @@
         {
             "name": "Christensen, Jeppe Brage",
             "orcid": "0000-0002-6894-381X",
-            "affiliation": "Paul Scherrer Institute (PSI)",
-            "type": "Author"
+            "affiliation": "Paul Scherrer Institute (PSI)"
         }
     ],
     "title": "tracketch: A Python package for simulating the response of solid-state nuclear track detectors",
@@ -12,7 +11,8 @@
     "access_right": "open",
     "related_identifiers": [
         {
-            "identifier": "http://dx.doi.org/10.2139/ssrn.6469212",
+            "scheme": "doi",
+            "identifier": "10.2139/ssrn.6469212",
             "relation": "isSupplementTo",
             "resource_type": "publication-article"
         }
@@ -26,9 +26,6 @@
     "license": "mit",
     "upload_type": "software",
     "language": "eng",
-    "grants": [
-        {"funder": "Swiss Federal Nuclear Safety Inspectorate (ENSI)"}
-    ],
     "communities": [
         {"identifier": "simulation-software"}
     ]
