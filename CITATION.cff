@@ -1,0 +1,13 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Christensen
+  given-names: Jeppe Brage
+orcid: "0000-0002-6894-381X"
+title: "A unified model for etched-track formation in CR-39 detectors using amorphous track structure theory"
+identifiers:
+  - type: doi
+    value: http://dx.doi.org/10.2139/ssrn.6469212
+version: v1.01
+date-released: 2026-05-04
+                                
