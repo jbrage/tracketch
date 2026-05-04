@@ -21,6 +21,10 @@ extensions = [
     "sphinx.ext.intersphinx",
 ]
 
+# GitHub Pages builds import the package directly from the repository root.
+# Mock native or platform-specific dependencies so autodoc can run in CI.
+autodoc_mock_imports = ["numba", "pyamtrack", "skfmm"]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "publication"]
 

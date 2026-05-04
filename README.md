@@ -2,7 +2,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-pytest-brightgreen.svg)](tests/)
-[![HitCount](https://hits.dwyl.com/{username}/{project-name}.svg)](https://hits.dwyl.com/{username}/{project-name})
+[![HitCount](https://hits.dwyl.com/jbrage/tracketch.svg?style=flat-square&show=unique)](http://hits.dwyl.com/jbrage/tracketch)
+
 
 
 # tracketch
