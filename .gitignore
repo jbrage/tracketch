@@ -32,8 +32,6 @@ docs/_build/
 .env
 .venv
 
-.github/
-
 # Ruff
 .ruff_cache/
 
