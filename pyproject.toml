@@ -29,6 +29,7 @@ dependencies = [
 
 cpp = [
     "pybind11>=2.6",
+    "setuptools",
 ]
 
 numba = [
@@ -56,6 +57,22 @@ dev = [
     "scikit-image",
     "sphinx>=8,<9",
     "sphinx-rtd-theme>=3.0",
+]
+
+all = [
+    "pybind11>=2.6",
+    "setuptools",
+    "numba>=0.57",
+    "numpy<=2.2",
+    "scikit-optimize",
+    "lmfit",
+    "tqdm",
+    "sphinx>=8,<9",
+    "sphinx-rtd-theme>=3.0",
+    "pytest",
+    "pytest-xdist",
+    "ruff",
+    "scikit-image",
 ]
 
 [tool.setuptools.packages.find]

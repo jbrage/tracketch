@@ -1,17 +1,28 @@
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://dosimetry.pages.psi.ch/tracketch/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://jbrage.github.io/tracketch/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-pytest-brightgreen.svg)](tests/)
-[![HitCount](https://hits.dwyl.com/jbrage/tracketch.svg?style=flat-square&show=unique)](http://hits.dwyl.com/jbrage/tracketch)
-
 
 
 # tracketch
 
 A Python toolkit for simulating ion tracks in CR-39 plastic nuclear track
-detectors.  Given an ion species, energy, and etching conditions, **tracketch**
+detectors.  Given an ion species, energy, and etching conditions, `tracketch`
 predicts the track countours, diameter, and depth that would be observed under an
 optical microscope after chemical etching.
+
+The work is published in the article
+[A unified model for etched-track formation in CR-39 detectors using amorphous track structure theory](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6469212) by Jeppe Brage Christensen.
+
+Cite as 
+```bibtex
+@article{christensen2026unified,
+  title={A unified model for etched-track formation in CR-39 detectors using amorphous track structure theory},
+  author={Christensen, Jeppe Brage},
+  journal={SSRN preprint http://dx.doi.org/10.2139/ssrn.6469212},
+  year={2026}
+}
+```
 
 <p align="center">
    <img src="docs/icons/logo.png" alt="tracketch logo" width="500">
@@ -29,48 +40,24 @@ optical microscope after chemical etching.
 
 ## Documentation
 
-The documentation is hosted online and includes user guides, API references, and examples:  
-[Online documentation](https://dosimetry.pages.psi.ch/tracketch/)  
+The documentation is hosted online and includes user guides, API references, and examples: [Documentation](https://jbrage.github.io/tracketch/)  
 
 ## How it works
 
 The simulation follows the same physics chain as the real experiment:
 
 1. **Radial dose distribution (RDD)**: the ion deposits energy radially via
-   delta-electrons.  tracketch computes the 2-D dose map along the ion path using
-   models from libamtrack (e.g. Cucinotta) and SRIM stopping-power tables.
+   delta-electrons.  `tracketch` computes the dose map along the ion path using
+   models from `libamtrack` (e.g. Cucinotta) and `SRIM` stopping-power tables.
 2. **Etch-rate model**: a calibrated function converts local dose to local
-   etch velocity *V(D)*.  The bulk (undamaged) material etches at a slower
-   constant rate *V_bulk*.
+   etch velocity $v_d$. The bulk (undamaged) material etches at a slower
+   constant rate $v_\text{bulk}$.
 3. **Wavefront propagation**: the etchant front is propagated from the
    detector surface into the bulk using shortest-path algorithms (Dijkstra or
-   Fast Marching).  The result is an *arrival-time map*.
+   Fast Marching), analogous to the propagation of a wavefront.  The result is an *arrival-time map*.
 4. **Track observables**: iso-time contours of the arrival-time map give the
    etched track shape at any desired etching duration.
 
-## Etch-rate model selection
-
-tracketch uses a single default calibration model for all particles:
-`"Doerschel_etching"`.
-
-- The etch-rate model is not selected by `particle_name`.
-- Particle selection affects stopping-power and dose physics, not which
-   etch-rate model file is loaded.
-- Users can still load a different etch-rate model explicitly (for example,
-   a custom re-calibrated model).
-
-```python
-from tracketch import TrackSimulator, load_etchrate_model
-
-# Explicitly load a custom calibration model if needed.
-etch_model = load_etchrate_model("my_custom_model")
-
-sim = TrackSimulator(
-      particle_name="12C",
-      start_energy_MeV_u=270.0,
-      etch_model=etch_model,
-)
-```
 
 ## Installation
 
@@ -79,13 +66,13 @@ sim = TrackSimulator(
 git clone <repo-url>/tracketch
 cd tracketch
 
-# create a virtual environment and install
+# create a virtual environment and install; change "all" to "numba" or "cpp" to only install one backend or to skip testing/docs dependencies
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[numba]"
+pip install -e ".[all]"
 ```
 
-This installs tracketch with the Numba-accelerated Dijkstra backend, which
+This installs `tracketch` with the Numba-accelerated Dijkstra backend, which
 works out of the box on any Linux machine.
 
 ### Optional: C++ Dijkstra backend
@@ -94,11 +81,10 @@ To also install the faster CPP backend, use
 pip install -e ".[numba,cpp]"
 cd tracketch/wavefront/dijkstra/cpp
 python setup_dijkstra.py build_ext --inplace
-cd -
 ```
 
 ## Minimal working example
-Check out the tracketch examples  in the [`examples/`](examples/) directory.
+Check out the `tracketch` examples  in the [`examples/`](examples/) directory.
 ```python
 import matplotlib.pyplot as plt
 from tracketch import TrackSimulator
@@ -142,7 +128,7 @@ and `symbol` is the element symbol:
 
 The available ions depend on the **stopping-power source**:
 
-- **`stopping_power_source="SRIM"` (default)** - uses tabulated SRIM data.
+- **`stopping_power_source="SRIM"` (default)** - uses tabulated `SRIM` data.
   Only the following particles are supported:
   ```python
   import tracketch
@@ -152,8 +138,8 @@ The available ions depend on the **stopping-power source**:
   Attempting any other particle raises a `ValueError` with a suggestion to
   switch source.
 
-- **`stopping_power_source="libamtrack"`** - uses the libamtrack/PSTAR
-  parametrisation. Accepts any nuclide name recognised by libamtrack, e.g.
+- **`stopping_power_source="libamtrack"`** - uses the `libamtrack`
+  parametrisation. Accepts any nuclide name recognised by `libamtrack`, e.g.
   `"56Fe"`, `"238U"`, `"28Si"`.
 
 ```python
@@ -180,7 +166,7 @@ Pass them as `material_name="CR39"` (default) or `material_name="water"`.
 
 ## Simulation grid
 
-The simulation operates on a 2D cylindrical grid (*r*, *z*) with these defaults:
+The simulation operates on a cylindrical grid (*r*, *z*) with these defaults:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -214,11 +200,16 @@ publication-quality results consider doubling `n_points_r` and `n_points_z`.
 Full API reference and usage guides can be re-built with Sphinx:
 
 ```bash
+pip install -e ".[docs]"
 cd docs
 make html
 ```
-
 Then open `docs/_build/html/index.html` in your browser.
+Or 
+```bash
+make pdlatex
+```
+to build the PDF version of the documentation.
 
 ## Project layout
 
