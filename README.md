@@ -2,6 +2,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-pytest-brightgreen.svg)](tests/)
+[![DOI](https://zenodo.org/badge/1228571338.svg)](https://doi.org/10.5281/zenodo.20024480)
 
 # tracketch
 
