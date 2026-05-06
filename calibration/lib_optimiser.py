@@ -1207,6 +1207,12 @@ def estimate_parameter_uncertainties(
         aggregation=aggregation,
     )
 
+    # The Hessian must reflect data constraint only — smoothness_weight=0 here.
+    # The regulariser is a prior that helps the optimiser converge but its
+    # curvature is artificial: it makes unconstrained high-dose anchors look
+    # well-identified, producing falsely *small* uncertainties for the anchors
+    # least constrained by the data.  Dropping it from the Hessian lets those
+    # anchors correctly surface as large-uncertainty parameters.
     objective_fn = partial(
         _objective_direct_logv,
         etch_model=etch_model,
@@ -1214,13 +1220,14 @@ def estimate_parameter_uncertainties(
         log_v_bulk=log_v_bulk,
         log_v_max=log_v_max,
         n_free=n_free,
-        smoothness_weight=smoothness_weight,
+        smoothness_weight=0.0,
         fit_debris_damping=fit_debris_damping,
         **cost_kwargs,
     )
 
+    # Evaluate cost at optimum using the data-only objective for scaling.
     f0 = objective_fn(x0)
-    print(f"Cost at optimum: {f0:.6e}")
+    print(f"Cost at optimum (data-only, no regularisation): {f0:.6e}")
     print(f"Parameters: {n_params}")
 
     # --- Compute Hessian via central finite differences ---

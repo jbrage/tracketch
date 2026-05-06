@@ -37,7 +37,7 @@ def starting_guess_v_um_h(
     Interpolate anchor velocities from a previously saved optimized model.
 
     Loads the saved model JSON, then uses PCHIP interpolation to map its
-    V(D) curve onto the requested anchor doses.  Values are clipped to
+    v(d) curve onto the requested anchor doses.  Values are clipped to
     [V_bulk, max_v_um].
     """
     saved_model = load_etchrate_model(CALIBRATED_MODEL_NAME)
@@ -70,30 +70,33 @@ final_fit = False
 final_fit = True
 
 if final_fit:
-    # Final-fit profile aligned with benchmark settings
-    de_popsize = 60
-    de_maxiter = 200
+    # Most thorough fit profile: broad DE search with extended convergence.
+    de_popsize = 70
+    de_maxiter = 300
     de_tol = 1e-6
     de_mutation = (0.5, 1.4)
     de_recombination = 0.9
     de_polish_method = "Powell"
     de_smoothness_weight = 0.001
-    fit_debris_damping = True
+    fit_debris_damping = True  # 5%-capped damping is now identifiable
 else:
     # Dev profile: faster iterations for quick checks
-    de_popsize = 15
-    de_maxiter = 30
+    de_popsize = 30
+    de_maxiter = 50
     de_tol = 1e-5
     de_mutation = (0.5, 1.0)
     de_recombination = 0.7
     de_polish_method = "Powell"
     de_smoothness_weight = 0.0
-    fit_debris_damping = False
+    fit_debris_damping = True  # 5%-capped damping is now identifiable
 
-# ---- Debris damping (co-optimized with V(D)) ----
+# ---- Debris damping ----
+# Not co-optimized: shape data alone cannot identify alpha/beta (optimizer
+# always escapes to alpha=max, beta=max, i.e. damping disabled).  Set fixed
+# values here if debris correction is desired; leave as None to disable.
 # eta = 1 / (1 + (aspect_ratio / alpha)**beta)
-debris_alpha_bounds_log10 = (0.1, 4.0)  # alpha in [0.1, 1e4]
-debris_beta_bounds = (0.3, 4.0)
+debris_alpha_bounds_log10 = (0.1, 3)
+debris_beta_bounds = (1.0, 6.0)
 
 # ---- Anchor setup ----
 # Only dose positions matter; DE finds the velocities automatically.
@@ -165,7 +168,7 @@ J_initial = cost_function(
 )
 print(f"Initial cost: {J_initial:.6e}")
 
-# ---- Single-pass: co-optimize V(D) + debris damping ----
+# ---- Single-pass: co-optimize v(d) + debris damping ----
 result = optimize_etch_model(
     etch_model,
     models_dict,
