@@ -12,7 +12,7 @@ predicts the track countours, diameter and length for a given etching duration.
 
 The work is published in the article
 [A unified model for etched-track formation in CR-39 detectors using amorphous
-track structure theory](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6469212)
+track structure theory](docs/RadMeas_paper.pdf)
 by Jeppe Brage Christensen.
 
 > **Note** - due to its dependency on

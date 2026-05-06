@@ -116,7 +116,10 @@ class TrackSimulator:
     dose_map : ndarray, shape (n_z, n_r)
         Local dose in Gy.
     etch_rate_map : ndarray, shape (n_z, n_r)
-        Local etch velocity in um/hr.
+        Local etch velocity in um/hr (with debris damping applied, if enabled).
+    etch_rate_map_nodebris : ndarray, shape (n_z, n_r)
+        Local etch velocity in um/hr *before* any debris damping.  Identical
+        to ``etch_rate_map`` when debris damping is disabled.
     arrival_time_map : ndarray, shape (n_z, n_r)
         Shortest etchant arrival time in hours.
     CSDA_range_um : float
@@ -164,7 +167,7 @@ class TrackSimulator:
 
     **Uncertainties**
 
-    Uncertainties are propagated from the calibrated V(D) anchor-velocity
+    Uncertainties are propagated from the calibrated v(d) anchor-velocity
     uncertainties.  These must first be estimated from a calibration dataset
     using :func:`calibration.lib_optimiser.estimate_parameter_uncertainties`
     and then stored on the etch model:
@@ -188,7 +191,7 @@ class TrackSimulator:
 
         radius_um, radius_unc_um = sim.get_track_radius_um_with_uncertainty(
             etch_time_h=3.0,  # etching duration
-            n_sigma=1.0,       # propagate +/-1 sigma of V(D) anchors
+            n_sigma=1.0,       # propagate +/-1 sigma of v(d) anchors
         )
 
         result = sim.get_track_length_um_with_uncertainty(
@@ -443,6 +446,21 @@ class TrackSimulator:
     def _calculate_etch_rate_map(self) -> None:
         """Convert dose map to etch-rate map via the etch model."""
         self.etch_rate_map = np.asarray(self.etch_model.eval(self.dose_map))
+        # Snapshot before debris damping is applied in-place.
+        self.etch_rate_map_nodebris = self.etch_rate_map.copy()
+
+    def _compute_arrival_time_for(self, etch_rate_map: np.ndarray) -> np.ndarray:
+        """Run wavefront propagation for an arbitrary etch-rate map."""
+        return get_arrival_time_map(
+            r_um=self._r_grid_um,
+            z_um=self._z_grid_um,
+            etch_rate_map=etch_rate_map,
+            method=self._arrival_time_method,
+            r_is_logscaled=self._logscale_r,
+            theta_deg=0.0,
+            n_uniform_multiplier=self._n_uniform_multiplier,
+            connectivity=self._dijkstra_connectivity,  # type: ignore
+        )
 
     def _calculate_arrival_time_map(self) -> None:
         """Compute shortest etchant arrival time via wavefront propagation."""
@@ -451,16 +469,7 @@ class TrackSimulator:
             self._arrival_time_method,
             self._dijkstra_connectivity,
         )
-        self.arrival_time_map = get_arrival_time_map(
-            r_um=self._r_grid_um,
-            z_um=self._z_grid_um,
-            etch_rate_map=self.etch_rate_map,
-            method=self._arrival_time_method,
-            r_is_logscaled=self._logscale_r,
-            theta_deg=0.0,
-            n_uniform_multiplier=self._n_uniform_multiplier,
-            connectivity=self._dijkstra_connectivity,  # type: ignore
-        )
+        self.arrival_time_map = self._compute_arrival_time_for(self.etch_rate_map)
 
     def _apply_debris_damping(self) -> None:
         """Apply diffusion-limited debris damping to the etch-rate map.
@@ -469,6 +478,20 @@ class TrackSimulator:
         by ``etch_model.debris_alpha`` (characteristic aspect ratio) and
         ``etch_model.debris_beta`` (transition steepness).  No-op when
         damping is disabled (alpha is None or <= 0).
+
+        The aspect ratio that governs damping magnitude is computed from
+        ``r_track`` — the outermost radius where the dose exceeds a low
+        threshold — which approximates the full pit radius and gives
+        physically meaningful aspect ratios (order 1–10).
+
+        Damping is *applied* only to cells where the etch rate exceeds
+        ``core_factor * V_bulk`` (the narrow high-rate core at r ≈ 0).
+        Because r_core << r_track, those cells all lie very close to r = 0
+        and receive near-uniform suppression.  Penumbra cells are untouched.
+
+        The original ``max(eta_core, 0.95)`` floor is reinstated to cap
+        damping at 5 % maximum strength, keeping the correction mild and
+        preventing the optimizer from over-compensating via v(d).
         """
         alpha = self.etch_model.debris_alpha
         beta = self.etch_model.debris_beta
@@ -477,8 +500,10 @@ class TrackSimulator:
             return
         logger.debug("Applying debris damping (alpha=%.3g, beta=%.3g)", alpha, beta)
 
-        V_bulk = self.etch_model.V_bulk_um_h
-        dose_threshold_Gy = 1.0
+        V_bulk = float(self.etch_model.V_bulk_um_h)
+        dose_threshold_Gy = 1.0  # defines full pit radius r_track
+        core_factor = 5.0  # cells with v > core_factor*V_bulk are damped
+        core_v_threshold = core_factor * V_bulk
         min_r_track_um = 0.01
 
         r_grid = self._r_grid_um
@@ -491,27 +516,40 @@ class TrackSimulator:
             if z <= 0:
                 continue
 
+            # --- pit radius from dose (gives physically meaningful AR) ---
             dose_profile = dose_map[j, :]
             track_mask = np.isfinite(dose_profile) & (dose_profile > dose_threshold_Gy)
             if not np.any(track_mask):
                 continue
-
             track_indices = np.where(track_mask)[0]
             r_track = r_grid[track_indices[-1]]
             if r_track < min_r_track_um:
                 continue
 
+            # --- core indices: where to apply damping ---
+            etch_slice = etch_map[j, :]
+            core_mask = etch_slice > core_v_threshold
+            if not np.any(core_mask):
+                continue
+            core_indices = np.where(core_mask)[0]
+
+            # --- damping magnitude from full pit aspect ratio ---
             aspect_ratio = z / r_track
             eta_core = 1.0 / (1.0 + (aspect_ratio / alpha) ** beta)
-            # Limit maximum suppression to 5 % even deep inside the pit.
+            # Hard cap: maximum 5 % suppression anywhere in the core.
+            # This keeps the correction physically mild and prevents the
+            # optimizer from collapsing v(d) to compensate for over-damping.
             eta_core = max(eta_core, 0.95)
 
-            r_values = r_grid[track_indices]
-            # Exponent 6 concentrates the effect tightly around r = 0;
-            # at r = 0.3 * r_track the factor is already < 0.12.
+            # --- radial profile normalised to r_track ---
+            # r_core << r_track so all core cells are near r=0 and receive
+            # approximately the full eta_core suppression; exponent 6 gives
+            # a smooth profile that concentrates damping tightly at centre.
+            r_values = r_grid[core_indices]
             radial_factor = np.clip(1.0 - r_values / r_track, 0.0, 1.0) ** 6
             eta_local = 1.0 - radial_factor * (1.0 - eta_core)
-            etch_map[j, track_indices] *= eta_local
+            etch_map[j, core_indices] *= eta_local
+            # Penumbra cells (not in core_indices) are untouched.
 
         np.maximum(etch_map, V_bulk, out=etch_map)
 
@@ -586,9 +624,9 @@ class TrackSimulator:
         ]
         | None
     ):
-        """Iso-time contour with uncertainty band from V(D) anchor uncertainties.
+        """Iso-time contour with uncertainty band from v(d) anchor uncertainties.
 
-        Computes arrival-time maps for V(D)+/-n_sigma*dV, extracts the three
+        Computes arrival-time maps for v(d)+/-n_sigma*dV, extracts the three
         contours, and interpolates the upper/lower bounds onto a common z grid
         suitable for ``ax.fill_betweenx``.
 
@@ -662,7 +700,169 @@ class TrackSimulator:
         r_lo = np.minimum(r_bound_0, r_bound_1)
         r_hi = np.maximum(r_bound_0, r_bound_1)
 
+        # Enforce a minimum experimental radial uncertainty band of +/- 0.15 um
+        # around the central contour at every z.
+        min_uncertainty_um = 0.1
+        r_central_on_band = _interp_r_on_z(central[0], central[1], z_band)
+        r_lo = np.minimum(r_lo, r_central_on_band - min_uncertainty_um)
+        r_hi = np.maximum(r_hi, r_central_on_band + min_uncertainty_um)
+
         return central, z_band, r_lo, r_hi
+
+    def get_iso_time_contour_with_normal_uncertainty(
+        self,
+        etching_time_h: float,
+        n_sigma: float = 1.0,
+        n_band_points: int = 200,
+        min_uncertainty_um: float = 0.15,
+    ) -> (
+        tuple[
+            tuple[np.ndarray, np.ndarray],
+            tuple[np.ndarray, np.ndarray],
+            tuple[np.ndarray, np.ndarray],
+        ]
+        | None
+    ):
+        """Iso-time contour with uncertainty expressed along local contour normals.
+
+        Unlike ``get_iso_time_contour_with_uncertainty`` (which returns a
+        radial ``r(z)`` band for ``fill_betweenx``), this method computes the
+        uncertainty envelope perpendicular to the contour itself. This keeps
+        the band visible and geometrically meaningful even where the contour
+        is horizontal.
+
+        Returns
+        -------
+        tuple of ``((r_c, z_c), (r_lo, z_lo), (r_hi, z_hi))`` or *None*.
+        """
+        if self.etch_model.anchor_velocity_uncertainties_um_h is None:
+            logger.warning(
+                "get_iso_time_contour_with_normal_uncertainty: "
+                "etch_model.anchor_velocity_uncertainties_um_h is None -- "
+                "returning None. Assign uncertainties from "
+                "estimate_parameter_uncertainties first."
+            )
+            return None
+
+        central = self.get_iso_time_contour(etching_time_h)
+        r_c_raw, z_c_raw = central
+        if len(r_c_raw) < 2:
+            return None
+
+        bound_contours: list[tuple[np.ndarray, np.ndarray]] = []
+        for sign in (+1.0, -1.0):
+            perturbed = self._make_perturbed_etch_model(sign, n_sigma)
+            etch_rate_map_pert = np.asarray(perturbed.eval(self.dose_map))
+            arrival_time_map_pert = get_arrival_time_map(
+                r_um=self._r_grid_um,
+                z_um=self._z_grid_um,
+                etch_rate_map=etch_rate_map_pert,
+                method=self._arrival_time_method,
+                r_is_logscaled=self._logscale_r,
+                theta_deg=0.0,
+                n_uniform_multiplier=self._n_uniform_multiplier,
+                connectivity=self._dijkstra_connectivity,  # type: ignore
+            )
+            r_b, z_b = get_iso_time_contour(
+                arrival_time_map=arrival_time_map_pert,
+                r_um=self._r_grid_um,
+                z_um=self._z_grid_um,
+                etching_time_h=etching_time_h,
+            )
+            if len(r_b) < 2:
+                continue
+            bound_contours.append((r_b, z_b))
+
+        if len(bound_contours) != 2:
+            return None
+
+        # Resample central contour uniformly in arc length.
+        ds = np.hypot(np.diff(r_c_raw), np.diff(z_c_raw))
+        s = np.concatenate(([0.0], np.cumsum(ds)))
+        s_max = float(s[-1])
+        if s_max <= 0:
+            return None
+        s_new = np.linspace(0.0, s_max, n_band_points)
+        r_c = np.interp(s_new, s, r_c_raw)
+        z_c = np.interp(s_new, s, z_c_raw)
+
+        # Unit normals from arc-length parameterization.
+        dr_ds = np.gradient(r_c, s_new)
+        dz_ds = np.gradient(z_c, s_new)
+        n_x = -dz_ds
+        n_y = dr_ds
+        n_norm = np.hypot(n_x, n_y)
+        n_norm = np.maximum(n_norm, 1e-12)
+        n_x /= n_norm
+        n_y /= n_norm
+
+        def _signed_normal_distance(
+            r_ref: np.ndarray,
+            z_ref: np.ndarray,
+            nx_ref: np.ndarray,
+            ny_ref: np.ndarray,
+            contour: tuple[np.ndarray, np.ndarray],
+        ) -> np.ndarray:
+            r_b, z_b = contour
+            # Nearest-point assignment from each central sample to bound contour.
+            dr = r_b[None, :] - r_ref[:, None]
+            dz = z_b[None, :] - z_ref[:, None]
+            d2 = dr * dr + dz * dz
+            j_near = np.argmin(d2, axis=1)
+            dr_near = dr[np.arange(len(r_ref)), j_near]
+            dz_near = dz[np.arange(len(r_ref)), j_near]
+            return dr_near * nx_ref + dz_near * ny_ref
+
+        sdist_0 = _signed_normal_distance(r_c, z_c, n_x, n_y, bound_contours[0])
+        sdist_1 = _signed_normal_distance(r_c, z_c, n_x, n_y, bound_contours[1])
+
+        s_lo = np.minimum(sdist_0, sdist_1)
+        s_hi = np.maximum(sdist_0, sdist_1)
+
+        # Enforce experimental minimum uncertainty along the local normal.
+        s_lo = np.minimum(s_lo, -float(min_uncertainty_um))
+        s_hi = np.maximum(s_hi, float(min_uncertainty_um))
+
+        r_lo = r_c + s_lo * n_x
+        z_lo = z_c + s_lo * n_y
+        r_hi = r_c + s_hi * n_x
+        z_hi = z_c + s_hi * n_y
+
+        # Clip to non-negative r: the symmetry axis (r=0) is the physical boundary.
+        # Near the axis the inward side of the band naturally clips there.
+        r_lo = np.maximum(r_lo, 0.0)
+        r_hi = np.maximum(r_hi, 0.0)
+
+        # Near the tip the contour is nearly vertical (radially inward), so the
+        # outward normals are nearly horizontal.  This means z_lo ≈ z_hi ≈ z_c
+        # at the axis and the z-extent of the band collapses to nearly zero there.
+        # Enforce a minimum z-band width of axis_z_width_um at the tip so the
+        # polygon always has a visible shaded cap around the contour terminus.
+        axis_z_width_um = 0.3
+        tip_idx = 0 if r_c[0] <= r_c[-1] else len(r_c) - 1
+        z_tip = float(z_c[tip_idx])
+        z_lo[tip_idx] = min(float(z_lo[tip_idx]), z_tip - axis_z_width_um)
+        z_hi[tip_idx] = max(float(z_hi[tip_idx]), z_tip + axis_z_width_um)
+
+        # Extend the uncertainty envelope all the way to the symmetry axis (r=0).
+        # The contour runs from the surface opening (large r) to the tip (small r).
+        # Detect dynamically which end is the tip and append/prepend accordingly.
+        if r_c[-1] <= r_c[0]:
+            # Tip at the end — append axis point
+            if r_lo[-1] > 0.0 or r_hi[-1] > 0.0:
+                r_lo = np.concatenate((r_lo, [0.0]))
+                z_lo = np.concatenate((z_lo, [z_lo[-1]]))
+                r_hi = np.concatenate((r_hi, [0.0]))
+                z_hi = np.concatenate((z_hi, [z_hi[-1]]))
+        else:
+            # Tip at the start — prepend axis point
+            if r_lo[0] > 0.0 or r_hi[0] > 0.0:
+                r_lo = np.concatenate(([0.0], r_lo))
+                z_lo = np.concatenate(([z_lo[0]], z_lo))
+                r_hi = np.concatenate(([0.0], r_hi))
+                z_hi = np.concatenate(([z_hi[0]], z_hi))
+
+        return (r_c, z_c), (r_lo, z_lo), (r_hi, z_hi)
 
     def get_track_radius_um(
         self, etch_time_h: float, threshold_percent: float = 5.0
@@ -682,6 +882,64 @@ class TrackSimulator:
             Track radius in um, or ``nan`` if no contour is found.
         """
         r_contour, z_contour = self.get_iso_time_contour(etch_time_h)
+        return get_track_radius_from_contour(
+            r_contour,
+            z_contour,
+            self.etch_model.V_bulk_um_h,
+            etch_time_h,
+            threshold_percent,
+        )
+
+    def get_iso_time_contour_nodebris(
+        self, etching_time_h: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Iso-time contour computed from the etch-rate map *without* debris damping.
+
+        Useful for comparing predicted track shapes with and without the
+        debris-transport correction.  The arrival-time map is computed on
+        demand from ``etch_rate_map_nodebris`` each time this method is
+        called (not cached).
+
+        Parameters
+        ----------
+        etching_time_h : float
+            Etching duration in hours.
+
+        Returns
+        -------
+        r_coords, z_coords : tuple[ndarray, ndarray]
+            Coordinates along the iso-time contour.
+        """
+        arrival_time_nodebris = self._compute_arrival_time_for(
+            self.etch_rate_map_nodebris
+        )
+        return get_iso_time_contour(
+            arrival_time_map=arrival_time_nodebris,
+            r_um=self._r_grid_um,
+            z_um=self._z_grid_um,
+            etching_time_h=etching_time_h,
+        )
+
+    def get_track_radius_um_nodebris(
+        self, etch_time_h: float, threshold_percent: float = 5.0
+    ) -> float:
+        """Track opening radius computed *without* debris damping.
+
+        Convenience wrapper around :meth:`get_iso_time_contour_nodebris`.
+
+        Parameters
+        ----------
+        etch_time_h : float
+            Etching duration in hours.
+        threshold_percent : float
+            Deviation threshold as percentage of bulk depth (default 5 %).
+
+        Returns
+        -------
+        float
+            Track radius in um, or ``nan`` if no contour is found.
+        """
+        r_contour, z_contour = self.get_iso_time_contour_nodebris(etch_time_h)
         return get_track_radius_from_contour(
             r_contour,
             z_contour,
@@ -733,10 +991,10 @@ class TrackSimulator:
         threshold_percent: float = 5.0,
         n_sigma: float = 1.0,
     ) -> tuple[float, float]:
-        """Track radius with uncertainty propagated from V(D) anchor uncertainties.
+        """Track radius with uncertainty propagated from v(d) anchor uncertainties.
 
-        Evaluates the etch-rate and arrival-time maps for V(D)+n_sigma*dV and
-        V(D)-n_sigma*dV, extracts a radius from each, and returns the central
+        Evaluates the etch-rate and arrival-time maps for v(d)+n_sigma*dV and
+        v(d)-n_sigma*dV, extracts a radius from each, and returns the central
         radius together with half the spread as the uncertainty estimate.
 
         Parameters
@@ -806,7 +1064,8 @@ class TrackSimulator:
         # cannot resolve the radius to better than one grid cell regardless
         # of the perturbation size.
         dr_min = float(np.min(np.diff(self._r_grid_um)))
-        radius_uncertainty = max(radius_uncertainty, 0.5 * dr_min)
+        min_uncertainty_um = 0.15
+        radius_uncertainty = max(radius_uncertainty, 0.5 * dr_min, min_uncertainty_um)
         return radius_central, radius_uncertainty
 
     def get_track_length_um_with_uncertainty(
@@ -815,9 +1074,9 @@ class TrackSimulator:
         relative_to_surface: bool = True,
         n_sigma: float = 1.0,
     ) -> tuple[float, float] | None:
-        """Track depth with uncertainty propagated from V(D) anchor uncertainties.
+        """Track depth with uncertainty propagated from v(d) anchor uncertainties.
 
-        Evaluates the arrival-time map for V(D)+n_sigma*dV and V(D)-n_sigma*dV,
+        Evaluates the arrival-time map for v(d)+n_sigma*dV and v(d)-n_sigma*dV,
         reads the depth at r = 0 for each, and returns the central depth together
         with half the spread as the uncertainty estimate.
 
@@ -878,6 +1137,9 @@ class TrackSimulator:
         depth_uncertainty = (
             0.5 * abs(depths[0] - depths[1]) if len(finite) == 2 else float("nan")
         )
+        if np.isfinite(depth_uncertainty):
+            min_uncertainty_um = 0.6
+            depth_uncertainty = max(depth_uncertainty, min_uncertainty_um)
         return float(depth_central), depth_uncertainty
 
     def get_track_length_um(
